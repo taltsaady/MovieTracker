@@ -1,0 +1,24 @@
+body {
+  font-family: Arial;
+  background: #111;
+  color: white;
+  text-align: center;
+}
+
+input, button {
+  padding: 10px;
+  font-size: 16px;
+}
+
+.movie {
+  background: #222;
+  margin: 15px auto;
+  padding: 10px;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 8px;
+}
+
+button {
+  cursor: pointer;
+}
