@@ -118,4 +118,3 @@ function rateMovie(id, rating) {
   data.rating = Number(rating);
   localStorage.setItem(id, JSON.stringify(data));
 }
-
