@@ -1,219 +1,357 @@
-const API_KEY = "f2a09b07222e3f21e22deff8a28b6a94";
-const OMDB_KEY = "6ebabb8a";
-
-/* =========================
-   חיפוש סרט
-========================= */
-function searchMovie() {
-  const query = document.getElementById("searchInput").value.trim();
-
-  if (!query) {
-    alert("הקלד שם סרט");
-    return;
-  }
-
-  fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=he-IL&query=${encodeURIComponent(query)}`
-  )
-    .then(res => res.json())
-    .then(data => showResults(data.results || []))
-    .catch(() => {
-      document.getElementById("results").innerHTML =
-        "<p>אירעה שגיאה בחיפוש.</p>";
-    });
+:root {
+  --bg-main: #0f1115;
+  --bg-card: #1a1d24;
+  --bg-input: #242933;
+  --border-color: #2f3644;
+  --primary: #e50914;
+  --primary-hover: #b80710;
+  --accent: #ff9f43;
+  --accent-hover: #f39c12;
+  --text-main: #ffffff;
+  --text-muted: #a0a7b5;
+  --success: #2ed573;
 }
 
-/* =========================
-   הצגת סרטים
-========================= */
-function showResults(movies) {
-  const results = document.getElementById("results");
-  results.innerHTML = "";
-
-  if (!movies.length) {
-    results.innerHTML = "<p>לא נמצאו תוצאות.</p>";
-    return;
-  }
-
-  movies.forEach(movie => loadMovieDetails(movie));
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* =========================
-   טעינת פרטי סרט
-========================= */
-async function loadMovieDetails(movie) {
-  const results = document.getElementById("results");
+body {
+  font-family: 'Rubik', Arial, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.6;
+  padding-bottom: 40px;
+}
 
-  try {
-    const tmdbResponse = await fetch(
-      `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&language=he-IL`
-    );
-    const details = await tmdbResponse.json();
+/* Header Styling */
+.app-header {
+  background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(15,17,21,0) 100%);
+  padding: 40px 20px 20px 20px;
+  text-align: center;
+}
 
-    const saved = JSON.parse(localStorage.getItem(movie.id)) || {};
-    const year = movie.release_date?.slice(0, 4) || "";
-    let imdbRating = saved.imdbRating || "לא זמין";
+.header-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-    if (details.imdb_id) {
-      const omdbResponse = await fetch(
-        `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${details.imdb_id}`
-      );
-      const omdb = await omdbResponse.json();
+.app-logo {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin-bottom: 5px;
+}
 
-      if (omdb.imdbRating && omdb.imdbRating !== "N/A") {
-        imdbRating = Number(omdb.imdbRating);
-        saved.imdbRating = imdbRating;
-        localStorage.setItem(movie.id, JSON.stringify(saved));
-      }
-    }
+.app-logo span {
+  color: var(--primary);
+}
 
-    renderMovie({
-      id: movie.id,
-      title: movie.original_title,
-      year,
-      overview: movie.overview || "אין תקציר בעברית",
-      imdbRating,
-      saved
-    });
-  } catch {
-    results.innerHTML += `
-      <div class="movie">
-        <h3>${movie.original_title}</h3>
-        <p>שגיאה בטעינת הסרט.</p>
-      </div>
-    `;
+.app-subtitle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 300;
+}
+
+/* Container */
+.app-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Search Section */
+.search-section {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .search-section {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
-/* =========================
-   יצירת כרטיס סרט
-========================= */
-function renderMovie(movie) {
-  const results = document.getElementById("results");
-
-  results.innerHTML += `
-    <div class="movie">
-      <h3>${movie.title} ${movie.year ? `(${movie.year})` : ""}</h3>
-
-      <p>${movie.overview}</p>
-
-      <p><strong>⭐ IMDb:</strong> ${movie.imdbRating}</p>
-
-      <button onclick="toggleSeen(${movie.id})">
-        ${movie.saved.seen ? "❌ לא ראיתי" : "✔ ראיתי"}
-      </button>
-
-      <div class="rating-box">
-        הדירוג שלך:
-        <input
-          type="number"
-          min="1"
-          max="10"
-          step="0.5"
-          ${movie.saved.seen ? "" : "disabled"}
-          value="${movie.saved.rating || ""}"
-          onchange="rateMovie(${movie.id}, this.value)"
-        >
-      </div>
-    </div>
-  `;
+.search-box {
+  display: flex;
+  flex: 1;
+  gap: 10px;
 }
 
-/* =========================
-   סימון ראיתי / לא ראיתי
-========================= */
-function toggleSeen(id) {
-  const data = JSON.parse(localStorage.getItem(id)) || {};
+#searchInput {
+  flex: 1;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--text-main);
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
 
-  if (data.seen) {
-    localStorage.removeItem(id);
-  } else {
-    data.seen = true;
-    localStorage.setItem(id, JSON.stringify(data));
+#searchInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.2);
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-accent {
+  background-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.btn-accent:hover {
+  background-color: var(--accent-hover);
+}
+
+/* Results Area */
+.section-title {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 500;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .results-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-
-  searchMovie();
 }
 
-/* =========================
-   דירוג אישי
-========================= */
-function rateMovie(id, rating) {
-  const data = JSON.parse(localStorage.getItem(id)) || {};
-
-  data.seen = true;
-  data.rating = Number(rating);
-
-  localStorage.setItem(id, JSON.stringify(data));
+/* Welcome Card & States */
+.welcome-card, .no-results, .error-msg, .loading-state {
+  grid-column: 1 / -1;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
 }
 
-/* =========================
-   המלצות חכמות
-========================= */
-function findRecommended() {
-  const likedMovies = Object.keys(localStorage).filter(id => {
-    const movie = JSON.parse(localStorage.getItem(id));
-    return movie?.seen && movie.rating >= 7;
-  });
+.welcome-card h3 {
+  color: var(--text-main);
+  margin-bottom: 10px;
+}
 
-  if (!likedMovies.length) {
-    alert("דרג לפחות סרט אחד בציון 7 ומעלה.");
-    return;
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.spinner {
+  font-size: 2.5rem;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+
+/* Movie Card Styling */
+.movie-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.movie-card:hover {
+  transform: translateY(-4px);
+  border-color: #404b5e;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+.movie-card.seen {
+  border-right: 5px solid var(--success);
+}
+
+.movie-poster {
+  width: 120px;
+  object-fit: cover;
+  background-color: var(--bg-input);
+}
+
+@media (min-width: 480px) {
+  .movie-poster {
+    width: 150px;
   }
-
-  const randomMovie =
-    likedMovies[Math.floor(Math.random() * likedMovies.length)];
-
-  fetchRecommendations(randomMovie);
 }
 
-/* =========================
-   שליפת המלצות
-========================= */
-async function fetchRecommendations(movieId) {
-  try {
-    const [detailsRes, keywordsRes] = await Promise.all([
-      fetch(
-        `https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}`
-      ),
-      fetch(
-        `https://api.themoviedb.org/3/movie/${movieId}/keywords?api_key=${API_KEY}`
-      )
-    ]);
+.movie-info {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
 
-    const details = await detailsRes.json();
-    const keywords = await keywordsRes.json();
+.movie-title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
 
-    const genres = details.genres.map(g => g.id).join(",");
-    const keywordIds = (keywords.keywords || [])
-      .slice(0, 5)
-      .map(k => k.id)
-      .join(",");
+.movie-year {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 300;
+}
 
-    let url =
-      `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}` +
-      `&language=he-IL&sort_by=vote_average.desc&vote_count.gte=500` +
-      `&with_genres=${genres}`;
+.movie-overview {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-    if (keywordIds) {
-      url += `&with_keywords=${keywordIds}`;
-    }
+.movie-meta {
+  display: flex;
+  gap: 10px;
+}
 
-    const response = await fetch(url);
-    const data = await response.json();
+.imdb-badge {
+  background-color: #f5c518;
+  color: #000;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
 
-    const recommendations = data.results.filter(movie => {
-      const saved = JSON.parse(localStorage.getItem(movie.id));
-      return !saved?.seen && movie.vote_average >= 6.5;
-    });
+/* Movie Actions inside Card */
+.movie-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
 
-    if (!recommendations.length) {
-      alert("לא נמצאו המלצות חדשות. נסה לדרג עוד סרטים.");
-      return;
-    }
-
-    showResults(recommendations.slice(0, 20));
-  } catch {
-    alert("אירעה שגיאה בקבלת ההמלצות.");
+@media (min-width: 580px) {
+  .movie-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
+}
+
+.btn-toggle {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.btn-unseen {
+  background-color: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.btn-unseen:hover {
+  background-color: var(--border-color);
+}
+
+.btn-seen {
+  background-color: rgba(46, 213, 115, 0.15);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.btn-seen:hover {
+  background-color: rgba(46, 213, 115, 0.25);
+}
+
+.rating-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.rating-input {
+  width: 65px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  text-align: center;
+}
+
+.rating-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.app-footer {
+  text-align: center;
+  margin-top: 60px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
