@@ -1,7 +1,6 @@
 const API_KEY = "f2a09b07222e3f21e22deff8a28b6a94";
 const OMDB_KEY = "6ebabb8a";
 
-// שמירת המצב הנוכחי של הסרטים המוצגים בזיכרון כדי לאפשר עדכון לוקאלי מיידי
 let currentMovies = [];
 
 /* ==========================================================================
@@ -16,12 +15,7 @@ function searchMovie() {
   }
 
   const resultsContainer = document.getElementById("results");
-  resultsContainer.innerHTML = `
-    <div class="loading-state">
-      <span class="spinner">⏳</span>
-      <p>מחפש סרטים תואמים ברשת...</p>
-    </div>
-  `;
+  resultsContainer.innerHTML = `<div class="loading-state"><span class="spinner">⏳</span><p>מחפש סרטים תואמים ברשת...</p></div>`;
 
   fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=he-IL&query=${encodeURIComponent(query)}`)
     .then(res => {
@@ -39,7 +33,7 @@ function searchMovie() {
 }
 
 /* ==========================================================================
-   עיבוד והצגת הסרטים (שימוש ב-Promise.all למניעת Race Conditions ושיפור ביצועים)
+   עיבוד והצגת הסרטים 
    ========================================================================== */
 async function displayMovies() {
   const resultsContainer = document.getElementById("results");
@@ -49,29 +43,24 @@ async function displayMovies() {
     return;
   }
 
-  // הצגת מצב ביניים בזמן השלמת הנתונים מ-OMDB ופרטים מורחבים
-  resultsContainer.innerHTML = `
-    <div class="loading-state">
-      <span class="spinner">🍿</span>
-      <p>טוען נתונים מורחבים ודירוגים...</p>
-    </div>
-  `;
+  resultsContainer.innerHTML = `<div class="loading-state"><span class="spinner">🍿</span><p>טוען נתונים מורחבים ודירוגים...</p></div>`;
 
   try {
-    // יצירת מערך של פרומיסים המעבדים את כל הסרטים במקביל תוך שמירה מלאה על הסדר המקורי
     const movieCardsHTML = await Promise.all(
       currentMovies.map(async (movie) => {
         try {
-          // משיכת פרטי הסרט מ-TMDB כדי להשיג את ה-imdb_id שלו
           const tmdbRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&language=he-IL`);
           if (!tmdbRes.ok) throw new Error("נכשל בטעינת פרטים מ-TMDB");
           const details = await tmdbRes.json();
 
-          const saved = JSON.parse(localStorage.getItem(movie.id)) || {};
+          let saved = {};
+          try {
+            saved = JSON.parse(localStorage.getItem(movie.id)) || {};
+          } catch(e) {} // הגנה מקריסת JSON
+
           const year = movie.release_date ? movie.release_date.slice(0, 4) : "";
           let imdbRating = saved.imdbRating || "לא זמין";
 
-          // משיכת הדירוג מ-OMDB במידה ויש מזהה IMDb ואין לנו אותו שמור עדיין
           if (details.imdb_id && (!saved.imdbRating || saved.imdbRating === "לא זמין")) {
             try {
               const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${details.imdb_id}`);
@@ -84,7 +73,7 @@ async function displayMovies() {
                 }
               }
             } catch (e) {
-              console.warn(`שגיאה במשיכת דירוג OMDB עבור סרט שמספרו ${movie.id}:`, e);
+              console.warn(`שגיאה במשיכת דירוג OMDB עבור סרט שמספרו ${movie.id}`);
             }
           }
 
@@ -104,13 +93,11 @@ async function displayMovies() {
           });
 
         } catch (singleErr) {
-          console.error(`שגיאה בעיבוד סרט בודד ${movie.id}:`, singleErr);
-          // כרטיס גיבוי במקרה של שגיאה נקודתית בסרט יחיד כדי שהרשימה כולה לא תקרוס
           return `
             <div class="movie-card">
               <div class="movie-info">
                 <h3 class="movie-title">${movie.title || movie.original_title}</h3>
-                <p class="movie-overview">אירעה שגיאה בטעינת הפרטים המלאים עבור סרט זה.</p>
+                <p class="movie-overview">אירעה שגיאה בטעינת הפרטים.</p>
               </div>
             </div>
           `;
@@ -118,11 +105,9 @@ async function displayMovies() {
       })
     );
 
-    // עדכון קובץ ה-HTML פעם אחת בלבד בסיום עיבוד כל הפרומיסים
     resultsContainer.innerHTML = movieCardsHTML.join("");
 
   } catch (globalErr) {
-    console.error("שגיאה גלובלית בהצגת התוצאות:", globalErr);
     resultsContainer.innerHTML = "<p class='error-msg'>❌ חלה שגיאה בלתי צפויה בעיבוד הסרטים לתצוגה.</p>";
   }
 }
@@ -154,7 +139,7 @@ function createMovieCardHTML(movie) {
             </button>
             
             <div class="rating-container">
-              <label for="rating-${movie.id}">דירוג:</label>
+              <label for="rating-${movie.id}">דירוג שלך:</label>
               <input 
                 id="rating-${movie.id}"
                 type="number" 
@@ -176,10 +161,11 @@ function createMovieCardHTML(movie) {
 }
 
 /* ==========================================================================
-   סימון ראיתי / לא ראיתי (שדרוג: מעדכן לוקאלית ללא קריאת רשת מחדש)
+   סימון ראיתי / לא ראיתי
    ========================================================================== */
 function toggleSeen(id) {
-  const data = JSON.parse(localStorage.getItem(id)) || {};
+  let data = {};
+  try { data = JSON.parse(localStorage.getItem(id)) || {}; } catch(e){}
 
   if (data.seen) {
     localStorage.removeItem(id);
@@ -187,39 +173,89 @@ function toggleSeen(id) {
     data.seen = true;
     localStorage.setItem(id, JSON.stringify(data));
   }
-
-  // שדרוג ארכיטקטוני: מרעננים את התצוגה ישירות מהזיכרון ללא פנייה כפולה ל-API
   displayMovies();
 }
 
-/* ==========================================================================
-   דירוג אישי
-   ========================================================================== */
 function rateMovie(id, rating) {
   if (rating === "") return;
-
   const numericRating = Number(rating);
   if (numericRating < 1 || numericRating > 10) {
     alert("נא להזין דירוג חוקי בין 1 ל-10");
     return;
   }
-
-  const data = JSON.parse(localStorage.getItem(id)) || {};
+  let data = {};
+  try { data = JSON.parse(localStorage.getItem(id)) || {}; } catch(e){}
   data.seen = true;
   data.rating = numericRating;
-
   localStorage.setItem(id, JSON.stringify(data));
   displayMovies();
 }
 
 /* ==========================================================================
-   המלצות חכות - בחירה רנדומלית מתוך רשימת המועדפים ליצירת גיוון
+   [חדש!] הצגת כל הסרטים שראיתי ודירגתי
+   ========================================================================== */
+async function showWatchedMovies() {
+  const resultsContainer = document.getElementById("results");
+  
+  // סריקה בטוחה של כל ה-Local Storage
+  const watchedIds = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      if (data && data.seen) {
+        watchedIds.push(key);
+      }
+    } catch(e) { /* מתעלם ממפתחות שאינם קשורים לאפליקציה */ }
+  }
+
+  if (watchedIds.length === 0) {
+    resultsContainer.innerHTML = "<p class='no-results'>📭 עדיין לא סימנת סרטים כ-'ראיתי'. חפשו סרט והתחילו לדרג!</p>";
+    return;
+  }
+
+  resultsContainer.innerHTML = `<div class="loading-state"><span class="spinner">📁</span><p>טוען את רשימת הסרטים שלך...</p></div>`;
+
+  try {
+    // משיכת פרטי הסרטים מ-TMDB עבור כל אלו שסימנו שראינו
+    const moviePromises = watchedIds.map(async (id) => {
+      const res = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${API_KEY}&language=he-IL`);
+      if (!res.ok) return null;
+      return await res.json();
+    });
+
+    const moviesData = await Promise.all(moviePromises);
+    
+    // סינון שגיאות ומעבר לתצוגה המרכזית
+    currentMovies = moviesData.filter(m => m !== null);
+    
+    if (currentMovies.length === 0) {
+       resultsContainer.innerHTML = "<p class='error-msg'>❌ לא הצלחנו לטעון את הסרטים שלך כרגע.</p>";
+       return;
+    }
+
+    displayMovies();
+  } catch(err) {
+    console.error(err);
+    resultsContainer.innerHTML = "<p class='error-msg'>❌ אירעה שגיאה בטעינת רשימת הסרטים.</p>";
+  }
+}
+
+/* ==========================================================================
+   [תוקן!] המלצות חכמות מבוססות על מנוע ההמלצות הרשמי של TMDB
    ========================================================================== */
 function findRecommended() {
-  const likedMovies = Object.keys(localStorage).filter(id => {
-    const movie = JSON.parse(localStorage.getItem(id));
-    return movie?.seen && movie.rating >= 7;
-  });
+  const likedMovies = [];
+  
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    try {
+      const movie = JSON.parse(localStorage.getItem(key));
+      if (movie?.seen && movie.rating >= 7) {
+        likedMovies.push(key);
+      }
+    } catch(e){}
+  }
 
   if (!likedMovies.length) {
     alert("סמנו לפחות סרט אחד כ-'ראיתי' ותנו לו ציון 7 ומעלה כדי שנוכל להבין את הטעם שלכם!");
@@ -230,67 +266,36 @@ function findRecommended() {
   fetchRecommendations(randomMovieId);
 }
 
-/* ==========================================================================
-   שליפת המלצות חכמות מבוססות ז'אנרים ומילות מפתח
-   ========================================================================== */
 async function fetchRecommendations(movieId) {
   const resultsContainer = document.getElementById("results");
-  resultsContainer.innerHTML = `
-    <div class="loading-state">
-      <span class="spinner">🧠</span>
-      <p>מנתח את העדפות הצפייה שלך ומחולל המלצות מותאמות...</p>
-    </div>
-  `;
+  resultsContainer.innerHTML = `<div class="loading-state"><span class="spinner">🧠</span><p>מנתח את העדפות הצפייה שלך ומחולל המלצות...</p></div>`;
 
   try {
-    const [detailsRes, keywordsRes] = await Promise.all([
-      fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}`),
-      fetch(`https://api.themoviedb.org/3/movie/${movieId}/keywords?api_key=${API_KEY}`)
-    ]);
-
-    if (!detailsRes.ok || !keywordsRes.ok) throw new Error("שגיאה במשיכת נתוני המקור");
-
-    const details = await detailsRes.json();
-    const keywords = await keywordsRes.json();
-
-    const genres = details.genres.map(g => g.id).join(",");
-    const keywordIds = (keywords.keywords || [])
-      .slice(0, 5)
-      .map(k => k.id)
-      .join(",");
-
-    let url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=he-IL&sort_by=vote_average.desc&vote_count.gte=300&with_genres=${genres}`;
-
-    if (keywordIds) {
-      url += `&with_keywords=${keywordIds}`;
+    // שלב 1: ניסיון למשוך ממנוע ההמלצות
+    let res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/recommendations?api_key=${API_KEY}&language=he-IL`);
+    let data = await res.json();
+    
+    // שלב 2: אם אין המלצות ישירות, נמשוך סרטים "דומים"
+    if (!data.results || data.results.length === 0) {
+      res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/similar?api_key=${API_KEY}&language=he-IL`);
+      data = await res.json();
     }
 
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("שגיאה בשליפת המלצות");
-    const data = await response.json();
-
-    // סינון סרטים שכבר קיימים בסטטוס "ראיתי" של המשתמש
+    // סינון סרטים שהמשתמש כבר ראה
     const recommendations = (data.results || []).filter(movie => {
-      const saved = JSON.parse(localStorage.getItem(movie.id));
-      return !saved?.seen && movie.vote_average >= 6.0;
+      try {
+        const saved = JSON.parse(localStorage.getItem(movie.id));
+        return !saved?.seen;
+      } catch(e) { return true; }
     });
 
     if (!recommendations.length) {
-      // אם הסינון המחמיר לא הניב תוצאות, ננסה גיבוי רחב יותר מבוסס פופולריות וז'אנר בלבד
-      const backupUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=he-IL&sort_by=popularity.desc&with_genres=${genres}`;
-      const backupRes = await fetch(backupUrl);
-      const backupData = await backupRes.json();
-      
-      currentMovies = (backupData.results || []).filter(m => !JSON.parse(localStorage.getItem(m.id))?.seen).slice(0, 12);
-    } else {
-      currentMovies = recommendations.slice(0, 12);
-    }
-
-    if (!currentMovies.length) {
-      resultsContainer.innerHTML = "<p class='no-results'>🤷‍♂️ לא הצלחנו למצוא סרטים מומלצים חדשים על סמך סרט זה. נסו לדרג סרטים נוספים!</p>";
+      resultsContainer.innerHTML = "<p class='no-results'>🤷‍♂️ לא מצאנו המלצות חדשות שמבוססות על הסרטים שלך. נסו לדרג סרטים אחרים!</p>";
       return;
     }
 
+    // הצגת 12 ההמלצות הטובות ביותר
+    currentMovies = recommendations.slice(0, 12);
     displayMovies();
 
   } catch (err) {
