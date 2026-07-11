@@ -1,24 +1,219 @@
-body {
-  font-family: Arial;
-  background: #111;
-  color: white;
-  text-align: center;
+const API_KEY = "f2a09b07222e3f21e22deff8a28b6a94";
+const OMDB_KEY = "6ebabb8a";
+
+/* =========================
+   חיפוש סרט
+========================= */
+function searchMovie() {
+  const query = document.getElementById("searchInput").value.trim();
+
+  if (!query) {
+    alert("הקלד שם סרט");
+    return;
+  }
+
+  fetch(
+    `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=he-IL&query=${encodeURIComponent(query)}`
+  )
+    .then(res => res.json())
+    .then(data => showResults(data.results || []))
+    .catch(() => {
+      document.getElementById("results").innerHTML =
+        "<p>אירעה שגיאה בחיפוש.</p>";
+    });
 }
 
-input, button {
-  padding: 10px;
-  font-size: 16px;
+/* =========================
+   הצגת סרטים
+========================= */
+function showResults(movies) {
+  const results = document.getElementById("results");
+  results.innerHTML = "";
+
+  if (!movies.length) {
+    results.innerHTML = "<p>לא נמצאו תוצאות.</p>";
+    return;
+  }
+
+  movies.forEach(movie => loadMovieDetails(movie));
 }
 
-.movie {
-  background: #222;
-  margin: 15px auto;
-  padding: 10px;
-  width: 90%;
-  max-width: 400px;
-  border-radius: 8px;
+/* =========================
+   טעינת פרטי סרט
+========================= */
+async function loadMovieDetails(movie) {
+  const results = document.getElementById("results");
+
+  try {
+    const tmdbResponse = await fetch(
+      `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&language=he-IL`
+    );
+    const details = await tmdbResponse.json();
+
+    const saved = JSON.parse(localStorage.getItem(movie.id)) || {};
+    const year = movie.release_date?.slice(0, 4) || "";
+    let imdbRating = saved.imdbRating || "לא זמין";
+
+    if (details.imdb_id) {
+      const omdbResponse = await fetch(
+        `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${details.imdb_id}`
+      );
+      const omdb = await omdbResponse.json();
+
+      if (omdb.imdbRating && omdb.imdbRating !== "N/A") {
+        imdbRating = Number(omdb.imdbRating);
+        saved.imdbRating = imdbRating;
+        localStorage.setItem(movie.id, JSON.stringify(saved));
+      }
+    }
+
+    renderMovie({
+      id: movie.id,
+      title: movie.original_title,
+      year,
+      overview: movie.overview || "אין תקציר בעברית",
+      imdbRating,
+      saved
+    });
+  } catch {
+    results.innerHTML += `
+      <div class="movie">
+        <h3>${movie.original_title}</h3>
+        <p>שגיאה בטעינת הסרט.</p>
+      </div>
+    `;
+  }
 }
 
-button {
-  cursor: pointer;
+/* =========================
+   יצירת כרטיס סרט
+========================= */
+function renderMovie(movie) {
+  const results = document.getElementById("results");
+
+  results.innerHTML += `
+    <div class="movie">
+      <h3>${movie.title} ${movie.year ? `(${movie.year})` : ""}</h3>
+
+      <p>${movie.overview}</p>
+
+      <p><strong>⭐ IMDb:</strong> ${movie.imdbRating}</p>
+
+      <button onclick="toggleSeen(${movie.id})">
+        ${movie.saved.seen ? "❌ לא ראיתי" : "✔ ראיתי"}
+      </button>
+
+      <div class="rating-box">
+        הדירוג שלך:
+        <input
+          type="number"
+          min="1"
+          max="10"
+          step="0.5"
+          ${movie.saved.seen ? "" : "disabled"}
+          value="${movie.saved.rating || ""}"
+          onchange="rateMovie(${movie.id}, this.value)"
+        >
+      </div>
+    </div>
+  `;
+}
+
+/* =========================
+   סימון ראיתי / לא ראיתי
+========================= */
+function toggleSeen(id) {
+  const data = JSON.parse(localStorage.getItem(id)) || {};
+
+  if (data.seen) {
+    localStorage.removeItem(id);
+  } else {
+    data.seen = true;
+    localStorage.setItem(id, JSON.stringify(data));
+  }
+
+  searchMovie();
+}
+
+/* =========================
+   דירוג אישי
+========================= */
+function rateMovie(id, rating) {
+  const data = JSON.parse(localStorage.getItem(id)) || {};
+
+  data.seen = true;
+  data.rating = Number(rating);
+
+  localStorage.setItem(id, JSON.stringify(data));
+}
+
+/* =========================
+   המלצות חכמות
+========================= */
+function findRecommended() {
+  const likedMovies = Object.keys(localStorage).filter(id => {
+    const movie = JSON.parse(localStorage.getItem(id));
+    return movie?.seen && movie.rating >= 7;
+  });
+
+  if (!likedMovies.length) {
+    alert("דרג לפחות סרט אחד בציון 7 ומעלה.");
+    return;
+  }
+
+  const randomMovie =
+    likedMovies[Math.floor(Math.random() * likedMovies.length)];
+
+  fetchRecommendations(randomMovie);
+}
+
+/* =========================
+   שליפת המלצות
+========================= */
+async function fetchRecommendations(movieId) {
+  try {
+    const [detailsRes, keywordsRes] = await Promise.all([
+      fetch(
+        `https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}`
+      ),
+      fetch(
+        `https://api.themoviedb.org/3/movie/${movieId}/keywords?api_key=${API_KEY}`
+      )
+    ]);
+
+    const details = await detailsRes.json();
+    const keywords = await keywordsRes.json();
+
+    const genres = details.genres.map(g => g.id).join(",");
+    const keywordIds = (keywords.keywords || [])
+      .slice(0, 5)
+      .map(k => k.id)
+      .join(",");
+
+    let url =
+      `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}` +
+      `&language=he-IL&sort_by=vote_average.desc&vote_count.gte=500` +
+      `&with_genres=${genres}`;
+
+    if (keywordIds) {
+      url += `&with_keywords=${keywordIds}`;
+    }
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const recommendations = data.results.filter(movie => {
+      const saved = JSON.parse(localStorage.getItem(movie.id));
+      return !saved?.seen && movie.vote_average >= 6.5;
+    });
+
+    if (!recommendations.length) {
+      alert("לא נמצאו המלצות חדשות. נסה לדרג עוד סרטים.");
+      return;
+    }
+
+    showResults(recommendations.slice(0, 20));
+  } catch {
+    alert("אירעה שגיאה בקבלת ההמלצות.");
+  }
 }
