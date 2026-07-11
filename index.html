@@ -2,18 +2,49 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>MovieTracker</title>
+  <title>MovieTracker - מעקב והמלצות סרטים חכמות</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
+  <!-- גופן מודרני מועדף -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<h1>🎬 MovieTracker</h1>
+  <header class="app-header">
+    <div class="header-container">
+      <h1 class="app-logo">🎬 Movie<span>Tracker</span></h1>
+      <p class="app-subtitle">יומן הסרטים האישי ומחולל ההמלצות החכם שלך</p>
+    </div>
+  </header>
 
-<input id="searchInput" placeholder="חפש סרט...">
-<button onclick="searchMovie()">חפש</button>
+  <main class="app-container">
+    <section class="search-section">
+      <div class="search-box">
+        <input id="searchInput" type="text" placeholder="הקלד שם של סרט לחצו על חפש..." autocomplete="off">
+        <button class="btn btn-primary" onclick="searchMovie()">🔍 חפש סרט</button>
+      </div>
+      <div class="recommendation-box">
+        <button class="btn btn-accent" onclick="findRecommended()">🎯 מצא סרטים מומלצים בשבילי</button>
+      </div>
+    </section>
 
-<div id="results"></div>
+    <section class="results-section">
+      <h2 class="section-title">תוצאות והמלצות</h2>
+      <div id="results" class="results-grid">
+        <div class="welcome-card">
+          <h3>ברוכים הבאים ל-MovieTracker! 🍿</h3>
+          <p>חפשו סרטים כדי לסמן בהם צפייה ולדרג אותם, או לחצו על כפתור ההמלצות כדי לקבל רעיונות לצפייה על סמך הטעם האישי שלכם.</p>
+        </div>
+      </div>
+    </section>
+  </main>
 
-<script src="app.js"></script>
+  <footer class="app-footer">
+    <p>MovieTracker &copy; 2026 | מופעל באמצעות TMDB & OMDB API</p>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
